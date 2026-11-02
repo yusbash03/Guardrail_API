@@ -8,7 +8,7 @@ Built for **Build What's Next with PayPal and AI** (PayPal AI Hackathon, 2026). 
 
 ## Status
 
-🛠️ **Backend API implemented** (`backend/`): domain + policy engine, auth, policies/merchants, carts, evaluation, purchases, approvals (password step-up), PayPal checkout (authorize → final check → capture/void), webhooks, ledger, dashboard, AI agent (11 tools, Gemini → Groq), background jobs. Not yet verified against the real PayPal Sandbox or a live LLM (Day-1 spike items still marked [VERIFY]). Frontend not started. See [`docs/quality/IMPLEMENTATION_ROADMAP.md`](docs/quality/IMPLEMENTATION_ROADMAP.md).
+✅ **Backend API implemented** (`backend/`): domain + policy engine, auth, policies/merchants, carts, evaluation, purchases, approvals (password step-up), PayPal checkout (authorize → final check → capture/void), webhooks, ledger, dashboard, AI agent (11 tools, Gemini → Groq), background jobs. The full purchase flow has been run end to end against the real PayPal Sandbox and live Gemini/Groq. The web app is in [Guardrail-UI](https://github.com/yusbash03/Guardrail-UI). See [`docs/quality/IMPLEMENTATION_ROADMAP.md`](docs/quality/IMPLEMENTATION_ROADMAP.md).
 
 ## How it works
 
