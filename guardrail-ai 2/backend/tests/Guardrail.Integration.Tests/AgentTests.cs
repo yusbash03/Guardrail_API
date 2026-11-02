@@ -147,6 +147,15 @@ public class AgentTests(GuardrailFactory factory)
         (await user.GetAsync("/api/v1/approvals")).Body.GetArrayLength().ShouldBe(0);
     }
 
+    [Theory]
+    [InlineData("1. **Whole Milk**\n   * **Price:** $4.29\n   * **Product ID:** `7bf52c03-8451-89af-a8ea-fe61d7400c87`\n\nWant a cart?",
+        "1. **Whole Milk**\n   * **Price:** $4.29\n\nWant a cart?")]
+    [InlineData("Cart 01a19b2d-ae7d-7976-bdda-6bc4fe20b503 is ready.", "Cart is ready.")]
+    [InlineData("Eggs (`f2325add-2d78-8879-995d-98e4b20f8fb4`) cost $3.99.", "Eggs cost $3.99.")]
+    [InlineData("You have $37.00 left.", "You have $37.00 left.")]
+    public void StripIds_RemovesRawIdsFromReplies(string input, string expected) =>
+        AgentOrchestrator.StripIds(input).ShouldBe(expected);
+
     [Fact]
     public async Task Registry_HasExactlyElevenTools()
     {

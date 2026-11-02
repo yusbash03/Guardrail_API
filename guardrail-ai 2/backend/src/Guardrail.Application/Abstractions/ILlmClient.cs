@@ -10,7 +10,10 @@ public enum LlmRole
     Tool,
 }
 
-public sealed record LlmToolCall(string Id, string Name, string ArgumentsJson);
+/// <param name="ProviderMetadata">Opaque provider data that must be echoed back on the next request (e.g. Gemini 3 thought signatures).</param>
+public sealed record LlmToolCall(string Id, string Name, string ArgumentsJson, LlmProviderMetadata? ProviderMetadata = null);
+
+public sealed record LlmProviderMetadata(string Provider, string Json);
 
 public sealed record LlmMessage(LlmRole Role, string? Content, IReadOnlyList<LlmToolCall>? ToolCalls = null, string? ToolCallId = null);
 

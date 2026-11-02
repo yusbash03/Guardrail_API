@@ -1,6 +1,7 @@
 # Render Blueprint (ADR-020). Field names follow DEPLOYMENT_GUIDE.md §3.1 — [VERIFY] against current Render docs before first sync.
 # Secrets (ConnectionStrings__Default, Jwt__SigningKey, PayPal__ClientId/ClientSecret/WebhookId, Llm__*__ApiKey,
-# Llm__Primary__Model, Jobs__InternalToken) live only in the guardrail-secrets env group, never in git.
+# Jobs__InternalToken, JOBS_TOKEN) live only in the guardrail-secrets env group, never in git. A local, git-ignored
+# .env.render holds them for pasting into the group ("Add from .env").
 services:
   - type: web
     name: guardrail-api
@@ -18,6 +19,9 @@ services:
         value: AUTHORIZE
       - key: Llm__Primary__BaseUrl
         value: https://generativelanguage.googleapis.com/v1beta/openai/
+      # Flash-Lite: verified 2026-11-02 with tool calls; gemini-3.5-flash's free tier is only 20 requests/day.
+      - key: Llm__Primary__Model
+        value: gemini-3.5-flash-lite
       - key: Llm__Fallback__BaseUrl
         value: https://api.groq.com/openai/v1
       - key: Llm__Fallback__Model

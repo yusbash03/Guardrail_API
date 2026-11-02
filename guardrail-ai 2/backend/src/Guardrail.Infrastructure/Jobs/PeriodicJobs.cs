@@ -39,23 +39,30 @@ public abstract class PeriodicJob(IServiceScopeFactory scopes, IOptions<JobsOpti
         }
 
         using var timer = new PeriodicTimer(Interval(options.Value));
-        do
+        try
         {
-            try
+            do
             {
-                await using var scope = scopes.CreateAsyncScope();
-                var count = await RunOnceAsync(scope.ServiceProvider.GetRequiredService<JobRunner>(), stoppingToken);
-                if (count > 0)
+                try
                 {
-                    logger.LogInformation("{Job} handled {Count} item(s)", GetType().Name, count);
+                    await using var scope = scopes.CreateAsyncScope();
+                    var count = await RunOnceAsync(scope.ServiceProvider.GetRequiredService<JobRunner>(), stoppingToken);
+                    if (count > 0)
+                    {
+                        logger.LogInformation("{Job} handled {Count} item(s)", GetType().Name, count);
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogError(ex, "{Job} failed", GetType().Name);
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex, "{Job} failed", GetType().Name);
-            }
+            while (await timer.WaitForNextTickAsync(stoppingToken));
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
+        catch (OperationCanceledException)
+        {
+            // Host shutting down (including a failed startup, e.g. port in use): not an error, and it must not mask the real cause.
+        }
     }
 }
 

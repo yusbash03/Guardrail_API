@@ -175,7 +175,7 @@ public sealed partial class AgentOrchestrator(
             code = ErrorCodes.AgentStepLimit;
         }
 
-        finalText = ClaimsCheck(finalText, successfulOutcomes);
+        finalText = ClaimsCheck(StripIds(finalText), successfulOutcomes);
 
         // 5. Persist ASSISTANT message with de-duplicated card refs (last wins per type+id).
         var deduped = cards
@@ -229,12 +229,26 @@ public sealed partial class AgentOrchestrator(
         return $"{text}\n\n_{ClaimNote}_";
     }
 
+    /// <summary>
+    /// Ids are for tool arguments, not people: the cards carry them. Removes "Product ID: …" lines and any other raw UUIDs.
+    /// The ids stay available to the model on later turns through <see cref="WithCardContext"/>.
+    /// </summary>
+    public static string StripIds(string text)
+    {
+        var withoutLabels = IdLabelLinePattern().Replace(text, string.Empty);
+        var withoutIds = InlineIdPattern().Replace(withoutLabels, string.Empty);
+        return withoutIds == text ? text : ExtraSpacesPattern().Replace(withoutIds, " ").Trim();
+    }
+
     private static string WithCardContext(AgentMessage message)
     {
-        var refs = CardHydrator.Parse(message.Cards).Where(c => c.Id is not null).ToList();
+        var refs = CardHydrator.Parse(message.Cards)
+            .Select(c => (c.Type, Ids: c.Id is { } id ? [id] : c.Ids ?? []))
+            .Where(c => c.Ids.Count > 0)
+            .ToList();
         return refs.Count == 0
             ? message.Content
-            : $"{message.Content}\n[server context: {string.Join(", ", refs.Select(c => $"{c.Type} {c.Id}"))}]";
+            : $"{message.Content}\n[server context: {string.Join("; ", refs.Select(c => $"{c.Type} {string.Join(",", c.Ids)}"))}]";
     }
 
     private static string PrimaryIntent(IReadOnlyList<ToolCallSummaryDto> calls) => calls.FirstOrDefault()?.Name switch
@@ -253,6 +267,17 @@ public sealed partial class AgentOrchestrator(
 
     [GeneratedRegex(@"\b(approved|paid|purchase complete|charged|payment (is )?complete|captured)\b", RegexOptions.IgnoreCase)]
     private static partial Regex ClaimPattern();
+
+    // A whole list/label line whose value is just an id, e.g. "   * **Product ID:** `7bf5…`".
+    [GeneratedRegex(@"^[ \t]*(?:[-*][ \t]+)?\**[\w ]*\bID\**:?\**:?[ \t]*`?[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}`?[ \t]*(?:\r?\n|$)",
+        RegexOptions.IgnoreCase | RegexOptions.Multiline)]
+    private static partial Regex IdLabelLinePattern();
+
+    [GeneratedRegex(@"[ \t]*\(?`?\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b`?\)?", RegexOptions.IgnoreCase)]
+    private static partial Regex InlineIdPattern();
+
+    [GeneratedRegex(@"(?<=\S)[ \t]{2,}")]
+    private static partial Regex ExtraSpacesPattern();
 }
 
 public sealed class ConversationService(IAppDbContext db, CardHydrator hydrator, TimeProvider clock)

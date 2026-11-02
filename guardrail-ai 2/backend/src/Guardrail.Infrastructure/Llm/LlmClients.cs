@@ -22,6 +22,9 @@ public sealed class LlmProviderOptions
 
     public int RequestsPerMinute { get; set; } = 8;
 
+    /// <summary>Optional OpenAI-style reasoning_effort (e.g. "low"); thinking models are otherwise slow enough to hit the timeout.</summary>
+    public string? ReasoningEffort { get; set; }
+
     public bool IsConfigured => !string.IsNullOrWhiteSpace(BaseUrl) && !string.IsNullOrWhiteSpace(Model) && !string.IsNullOrWhiteSpace(ApiKey);
 }
 
@@ -31,7 +34,7 @@ public sealed class LlmSettings
 
     public LlmProviderOptions Primary { get; set; } = new()
     {
-        Provider = "Gemini", BaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/", RequestsPerMinute = 8,
+        Provider = "Gemini", BaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/", RequestsPerMinute = 8, ReasoningEffort = "low",
     };
 
     public LlmProviderOptions Fallback { get; set; } = new()
@@ -69,10 +72,15 @@ public sealed class OpenAiCompatibleLlmClient(HttpClient http, LlmProviderOption
         var body = new JsonObject
         {
             ["model"] = provider.Model,
-            ["messages"] = new JsonArray(messages.Select(ToJson).ToArray<JsonNode?>()),
+            ["messages"] = new JsonArray(messages.Select(m => (JsonNode)ToJson(m, provider.Provider)).ToArray<JsonNode?>()),
             ["temperature"] = options.Temperature,
             ["max_tokens"] = options.MaxOutputTokens,
         };
+        if (!string.IsNullOrWhiteSpace(provider.ReasoningEffort))
+        {
+            body["reasoning_effort"] = provider.ReasoningEffort;
+        }
+
         if (tools.Count > 0)
         {
             body["tools"] = new JsonArray(tools.Select(t => (JsonNode)new JsonObject
@@ -133,7 +141,10 @@ public sealed class OpenAiCompatibleLlmClient(HttpClient http, LlmProviderOption
                 var args = function.TryGetProperty("arguments", out var a)
                     ? a.ValueKind == JsonValueKind.String ? a.GetString() ?? "{}" : a.GetRawText()
                     : "{}";
-                calls.Add(new LlmToolCall(id, function.GetProperty("name").GetString() ?? string.Empty, args));
+                var extra = call.TryGetProperty("extra_content", out var e) && e.ValueKind == JsonValueKind.Object
+                    ? new LlmProviderMetadata(provider.Provider, e.GetRawText())
+                    : null;
+                calls.Add(new LlmToolCall(id, function.GetProperty("name").GetString() ?? string.Empty, args, extra));
             }
         }
 
@@ -148,7 +159,7 @@ public sealed class OpenAiCompatibleLlmClient(HttpClient http, LlmProviderOption
         return new LlmResponse(content, calls, provider.Provider, provider.Model, usage);
     }
 
-    private static JsonObject ToJson(LlmMessage m)
+    private static JsonObject ToJson(LlmMessage m, string providerName)
     {
         var obj = new JsonObject
         {
@@ -163,11 +174,22 @@ public sealed class OpenAiCompatibleLlmClient(HttpClient http, LlmProviderOption
         };
         if (m.ToolCalls is { Count: > 0 } calls)
         {
-            obj["tool_calls"] = new JsonArray(calls.Select(c => (JsonNode)new JsonObject
+            obj["tool_calls"] = new JsonArray(calls.Select(c =>
             {
-                ["id"] = c.Id,
-                ["type"] = "function",
-                ["function"] = new JsonObject { ["name"] = c.Name, ["arguments"] = c.ArgumentsJson },
+                var call = new JsonObject
+                {
+                    ["id"] = c.Id,
+                    ["type"] = "function",
+                    ["function"] = new JsonObject { ["name"] = c.Name, ["arguments"] = c.ArgumentsJson },
+                };
+
+                // Only echo metadata to the provider that produced it; others (Groq) reject unknown fields after a failover.
+                if (c.ProviderMetadata is { } meta && meta.Provider == providerName)
+                {
+                    call["extra_content"] = JsonNode.Parse(meta.Json);
+                }
+
+                return (JsonNode)call;
             }).ToArray<JsonNode?>());
         }
 
