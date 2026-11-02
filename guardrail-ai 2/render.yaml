@@ -1,0 +1,37 @@
+# Render Blueprint (ADR-020). Field names follow DEPLOYMENT_GUIDE.md §3.1 — [VERIFY] against current Render docs before first sync.
+# Secrets (ConnectionStrings__Default, Jwt__SigningKey, PayPal__ClientId/ClientSecret/WebhookId, Llm__*__ApiKey,
+# Llm__Primary__Model, Jobs__InternalToken) live only in the guardrail-secrets env group, never in git.
+services:
+  - type: web
+    name: guardrail-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    envVars:
+      - fromGroup: guardrail-secrets
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: PayPal__BaseUrl
+        value: https://api-m.sandbox.paypal.com
+      - key: PayPal__Intent
+        value: AUTHORIZE
+      - key: Llm__Primary__BaseUrl
+        value: https://generativelanguage.googleapis.com/v1beta/openai/
+      - key: Llm__Fallback__BaseUrl
+        value: https://api.groq.com/openai/v1
+      - key: Llm__Fallback__Model
+        value: openai/gpt-oss-120b
+  - type: cron
+    name: guardrail-jobs
+    runtime: image
+    image:
+      url: docker.io/curlimages/curl:8.10.1
+    schedule: "*/10 * * * *"
+    dockerCommand: >-
+      sh -c 'curl -fsS -X POST -H "X-Job-Token: $JOBS_TOKEN"
+      https://guardrail-api.onrender.com/api/v1/internal/jobs/run'
+    envVars:
+      - fromGroup: guardrail-secrets   # must define JOBS_TOKEN (same value as Jobs__InternalToken) [VERIFY]
+envVarGroups:
+  - name: guardrail-secrets

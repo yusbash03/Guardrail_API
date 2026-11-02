@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Guardrail.Api/Guardrail.Api.csproj" />
+    <Project Path="src/Guardrail.Application/Guardrail.Application.csproj" />
+    <Project Path="src/Guardrail.Domain/Guardrail.Domain.csproj" />
+    <Project Path="src/Guardrail.Infrastructure/Guardrail.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Guardrail.Architecture.Tests/Guardrail.Architecture.Tests.csproj" />
+    <Project Path="tests/Guardrail.Domain.Tests/Guardrail.Domain.Tests.csproj" />
+    <Project Path="tests/Guardrail.Integration.Tests/Guardrail.Integration.Tests.csproj" />
+  </Folder>
+</Solution>

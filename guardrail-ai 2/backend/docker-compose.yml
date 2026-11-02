@@ -1,0 +1,14 @@
+# Local PostgreSQL for development (matches appsettings.Development.json).
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: guardrail
+      POSTGRES_USER: guardrail
+      POSTGRES_PASSWORD: guardrail
+    ports:
+      - "5432:5432"
+    volumes:
+      - guardrail-pg:/var/lib/postgresql/data
+volumes:
+  guardrail-pg:

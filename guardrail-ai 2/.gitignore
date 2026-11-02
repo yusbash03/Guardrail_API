@@ -1,0 +1,62 @@
+# ---- OS / editors ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ---- Secrets (never commit) ----
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+appsettings.Local.json
+secrets.json
+*.pfx
+*.pem
+*.key
+
+# ---- .NET ----
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+TestResults/
+*.trx
+coverage*/
+*.coverage
+*.coveragexml
+.vs/
+artifacts/
+publish/
+
+# ---- Node / frontend ----
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+coverage/
+playwright-report/
+test-results/
+.vercel/
+
+# ---- PWA build output ----
+dev-dist/
+sw.js.map
+
+# ---- Misc ----
+*.log
+tmp/
+.cache/
