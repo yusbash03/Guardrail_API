@@ -3,6 +3,7 @@ using Guardrail.Application.Abstractions;
 using Guardrail.Application.Common;
 using Guardrail.Application.Policies;
 using Guardrail.Domain.Agent;
+using Guardrail.Domain.Audit;
 using Guardrail.Domain.Common;
 using Guardrail.Domain.Policy;
 using Microsoft.EntityFrameworkCore;
@@ -52,7 +53,8 @@ public sealed partial class AgentOrchestrator(
                 new Dictionary<string, string[]> { ["content"] = ["Must be between 1 and 2000 characters."] });
         }
 
-        var conversation = await db.Conversations.SingleOrDefaultAsync(c => c.Id == conversationId && c.UserId == userId, cancellationToken);
+        var conversation = await db.Conversations.SingleOrDefaultAsync(
+            c => c.Id == conversationId && c.UserId == userId && c.Status == ConversationStatus.Active, cancellationToken);
         if (conversation is null)
         {
             return DomainError.NotFound("Conversation");
@@ -280,7 +282,7 @@ public sealed partial class AgentOrchestrator(
     private static partial Regex ExtraSpacesPattern();
 }
 
-public sealed class ConversationService(IAppDbContext db, CardHydrator hydrator, TimeProvider clock)
+public sealed class ConversationService(IAppDbContext db, CardHydrator hydrator, AuditWriter audit, TimeProvider clock)
 {
     public async Task<ConversationDto> CreateAsync(Guid userId, string? title, CancellationToken cancellationToken)
     {
@@ -291,13 +293,13 @@ public sealed class ConversationService(IAppDbContext db, CardHydrator hydrator,
     }
 
     public async Task<IReadOnlyList<ConversationDto>> ListAsync(Guid userId, CancellationToken cancellationToken) =>
-        (await db.Conversations.AsNoTracking().Where(c => c.UserId == userId)
+        (await db.Conversations.AsNoTracking().Where(c => c.UserId == userId && c.Status == ConversationStatus.Active)
             .OrderByDescending(c => c.LastMessageAt ?? c.CreatedAt).Take(100).ToListAsync(cancellationToken))
         .Select(ToDto).ToList();
 
     public async Task<Result<IReadOnlyList<AgentMessageDto>>> MessagesAsync(Guid userId, Guid conversationId, int? afterSequence, CancellationToken cancellationToken)
     {
-        if (!await db.Conversations.AnyAsync(c => c.Id == conversationId && c.UserId == userId, cancellationToken))
+        if (!await db.Conversations.AnyAsync(c => c.Id == conversationId && c.UserId == userId && c.Status == ConversationStatus.Active, cancellationToken))
         {
             return DomainError.NotFound("Conversation");
         }
@@ -314,6 +316,25 @@ public sealed class ConversationService(IAppDbContext db, CardHydrator hydrator,
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// DELETE /agent/conversations/{id}: archives (soft-deletes) the conversation. It disappears from the list and its
+    /// messages can no longer be read or appended to. Not found, not owned and already archived are all 404 (SEC-11).
+    /// </summary>
+    public async Task<Result<Unit>> ArchiveAsync(Guid userId, Guid conversationId, CancellationToken cancellationToken)
+    {
+        var conversation = await db.Conversations.SingleOrDefaultAsync(
+            c => c.Id == conversationId && c.UserId == userId && c.Status == ConversationStatus.Active, cancellationToken);
+        if (conversation is null)
+        {
+            return DomainError.NotFound("Conversation");
+        }
+
+        conversation.Archive(clock.GetUtcNow());
+        audit.Write(AuditActions.ConversationArchived, "AgentConversation", conversation.Id, userId, ActorType.User);
+        await db.SaveChangesAsync(cancellationToken);
+        return Unit.Value;
     }
 
     private static ConversationDto ToDto(AgentConversation c) => new(c.Id, c.Title, c.Status, c.LastMessageAt, c.CreatedAt);

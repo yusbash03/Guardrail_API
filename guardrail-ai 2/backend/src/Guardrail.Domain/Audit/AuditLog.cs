@@ -34,6 +34,7 @@ public static class AuditActions
     public const string AmountMismatch = "AMOUNT_MISMATCH";
     public const string UnexpectedCapture = "UNEXPECTED_CAPTURE";
     public const string AgentToolRejected = "AGENT_TOOL_REJECTED";
+    public const string ConversationArchived = "CONVERSATION_ARCHIVED";
 }
 
 public sealed class AuditLog

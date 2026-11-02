@@ -24,6 +24,8 @@ public static class DependencyInjection
         {
             throw new InvalidOperationException("ConnectionStrings:Default is required (env ConnectionStrings__Default).");
         }
+
+        connectionString = PostgresConnectionString.Normalize(connectionString);
         services.AddDbContext<AppDbContext>(o => o
             .UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(0))
             .UseSnakeCaseNamingConvention());

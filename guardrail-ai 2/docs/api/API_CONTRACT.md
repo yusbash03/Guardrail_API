@@ -176,6 +176,7 @@ Cart mutation endpoints accept `If-Match: "<cartVersion>"` (optional; mismatch �
 |---|---|---|
 | POST | `/agent/conversations` | `{ title? }` → 201 `{ id, title, createdAt }` |
 | GET | `/agent/conversations` | list |
+| DELETE | `/agent/conversations/{id}` | archive (soft delete) → 204; hidden from the list, messages GET/POST → 404; carts, purchases and approvals it produced are kept; not found / not owned / already archived → 404 |
 | GET | `/agent/conversations/{id}/messages?afterSequence=` | messages with hydrated cards |
 | POST | `/agent/conversations/{id}/messages` | `{ content }` (1–2000 chars) → 200 `AgentTurnResponse` |
 

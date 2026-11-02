@@ -68,6 +68,10 @@ public static class LedgerAndAgentEndpoints
         agent.MapGet("/", async (ConversationService service, HttpContext ctx) =>
             Results.Json(await service.ListAsync(ctx.UserId(), ctx.RequestAborted), JsonDefaults.Options));
 
+        agent.MapDelete("/{id:guid}", async (Guid id, ConversationService service, HttpContext ctx) =>
+            (await service.ArchiveAsync(ctx.UserId(), id, ctx.RequestAborted)).ToHttp(ctx, StatusCodes.Status204NoContent))
+            .RequireRateLimiting(RateLimitPolicies.Mutations);
+
         agent.MapGet("/{id:guid}/messages", async (Guid id, int? afterSequence, ConversationService service, HttpContext ctx) =>
             (await service.MessagesAsync(ctx.UserId(), id, afterSequence, ctx.RequestAborted)).ToHttp(ctx));
 

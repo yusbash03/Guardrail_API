@@ -1,18 +1,33 @@
 # Render Blueprint (ADR-020). Field names follow DEPLOYMENT_GUIDE.md §3.1 — [VERIFY] against current Render docs before first sync.
-# Secrets (ConnectionStrings__Default, Jwt__SigningKey, PayPal__ClientId/ClientSecret/WebhookId, Llm__*__ApiKey,
-# Jobs__InternalToken, JOBS_TOKEN) live only in the guardrail-secrets env group, never in git. A local, git-ignored
-# .env.render holds them for pasting into the group ("Add from .env").
+# Secrets (Jwt__SigningKey, PayPal__ClientId/ClientSecret/WebhookId, Llm__*__ApiKey, Jobs__InternalToken, JOBS_TOKEN)
+# live only in the guardrail-secrets env group, never in git. A local, git-ignored .env.render holds them for pasting
+# into the group ("Add from .env"). The database connection string comes from the Render database below.
+databases:
+  # Hackathon/demo: Render Postgres instead of Neon. The free plan expires ~30 days after creation [VERIFY on Render].
+  - name: guardrail-db
+    databaseName: guardrail
+    user: guardrail
+    plan: free
 services:
   - type: web
     name: guardrail-api
     runtime: docker
-    rootDir: backend
+    # Relative to the git repo root (Guardrail_API), which holds this project under "guardrail-ai 2/".
+    rootDir: "guardrail-ai 2/backend"
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/v1/health
     envVars:
       - fromGroup: guardrail-secrets
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      # Internal postgres:// URL (same region, no TLS needed); the app converts it to Npgsql format.
+      - key: ConnectionStrings__Default
+        fromDatabase:
+          name: guardrail-db
+          property: connectionString
+      # No separate migration step for the demo database (ADR-014 deviation): apply migrations on boot.
+      - key: Database__MigrateOnStartup
+        value: "true"
       - key: PayPal__BaseUrl
         value: https://api-m.sandbox.paypal.com
       - key: PayPal__Intent
@@ -39,3 +54,4 @@ services:
       - fromGroup: guardrail-secrets   # must define JOBS_TOKEN (same value as Jobs__InternalToken) [VERIFY]
 envVarGroups:
   - name: guardrail-secrets
+    envVars: []   # values are pasted in the dashboard from .env.render, never committed

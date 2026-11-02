@@ -46,6 +46,12 @@ public sealed class LlmSettings
 
     /// <summary>Longest Retry-After we wait on the primary before failing over for the rest of the turn.</summary>
     public int MaxRetryAfterSeconds { get; set; } = 5;
+
+    /// <summary>
+    /// Longest Retry-After we wait on the fallback. It is the last resort, so waiting beats failing the turn
+    /// (Groq's free tier is 8k tokens/min and a shopping turn can exceed it); bounded by Agent:TurnTimeoutSeconds anyway.
+    /// </summary>
+    public int FallbackMaxRetryAfterSeconds { get; set; } = 20;
 }
 
 public sealed class LlmProviderException(string provider, HttpStatusCode? status, TimeSpan? retryAfter, string message, Exception? inner = null)
@@ -287,7 +293,8 @@ public sealed class RateLimitedLlmRouter(
         {
             try
             {
-                return await CallAsync(PrimaryClientName, settings.Primary, limiters.Primary, messages, tools, llmOptions, settings, cancellationToken);
+                return await CallAsync(PrimaryClientName, settings.Primary, limiters.Primary, messages, tools, llmOptions,
+                    TimeSpan.FromSeconds(settings.MaxRetryAfterSeconds), cancellationToken);
             }
             catch (LlmProviderException ex)
             {
@@ -301,7 +308,8 @@ public sealed class RateLimitedLlmRouter(
         {
             try
             {
-                return await CallAsync(FallbackClientName, settings.Fallback, limiters.Fallback, messages, tools, llmOptions, settings, cancellationToken);
+                return await CallAsync(FallbackClientName, settings.Fallback, limiters.Fallback, messages, tools, llmOptions,
+                    TimeSpan.FromSeconds(settings.FallbackMaxRetryAfterSeconds), cancellationToken);
             }
             catch (LlmProviderException ex)
             {
@@ -320,7 +328,7 @@ public sealed class RateLimitedLlmRouter(
         IReadOnlyList<LlmMessage> messages,
         IReadOnlyList<LlmToolDefinition> tools,
         LlmOptions llmOptions,
-        LlmSettings settings,
+        TimeSpan maxRetryAfter,
         CancellationToken cancellationToken)
     {
         using var lease = await limiter.AcquireAsync(1, cancellationToken);
@@ -335,9 +343,9 @@ public sealed class RateLimitedLlmRouter(
             return await client.CompleteAsync(messages, tools, llmOptions, cancellationToken);
         }
         catch (LlmProviderException ex) when (ex.Status == HttpStatusCode.TooManyRequests
-                                              && ex.RetryAfter is { } wait && wait <= TimeSpan.FromSeconds(settings.MaxRetryAfterSeconds))
+                                              && ex.RetryAfter is { } wait && wait <= maxRetryAfter)
         {
-            // Honour a short Retry-After once, then let the caller fail over.
+            // Honour a short Retry-After once, then let the caller fail over (or give up, on the fallback).
             await Task.Delay(wait, cancellationToken);
             return await client.CompleteAsync(messages, tools, llmOptions, cancellationToken);
         }

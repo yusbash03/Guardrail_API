@@ -202,6 +202,33 @@ public class AgentTests(GuardrailFactory factory)
     private static JsonElement Data(DispatchResult result) =>
         JsonDocument.Parse(result.ModelContent).RootElement.GetProperty("data").Clone();
 
+    [Fact]
+    public async Task IT23_DeleteConversation_ArchivesIt_HidesItAndBlocksFurtherUse()
+    {
+        var user = await TestUser.RegisterAsync(factory);
+        var keep = await user.PostAsync("/api/v1/agent/conversations", new { title = "Keep" });
+        var remove = await user.PostAsync("/api/v1/agent/conversations", new { title = "Remove" });
+        var path = $"/api/v1/agent/conversations/{remove.Id()}";
+
+        // Another user can't delete it, and can't tell it exists (SEC-11).
+        var bob = await TestUser.RegisterAsync(factory);
+        (await bob.SendAsync(HttpMethod.Delete, path, null)).Status.ShouldBe(HttpStatusCode.NotFound);
+
+        (await user.SendAsync(HttpMethod.Delete, path, null)).Status.ShouldBe(HttpStatusCode.NoContent);
+
+        var list = (await user.GetAsync("/api/v1/agent/conversations")).Body.EnumerateArray().Select(c => c.GetProperty("id").GetString()).ToList();
+        list.ShouldContain(keep.Id().ToString());
+        list.ShouldNotContain(remove.Id().ToString());
+
+        (await user.GetAsync($"{path}/messages")).Status.ShouldBe(HttpStatusCode.NotFound);
+        (await user.PostAsync($"{path}/messages", new { content = "Still there?" })).Status.ShouldBe(HttpStatusCode.NotFound);
+        (await user.SendAsync(HttpMethod.Delete, path, null)).Status.ShouldBe(HttpStatusCode.NotFound);
+
+        var audit = await user.GetAsync("/api/v1/audit-logs?entityType=AgentConversation");
+        audit.Body.GetProperty("items").EnumerateArray()
+            .ShouldContain(a => a.GetProperty("action").GetString() == "CONVERSATION_ARCHIVED" && a.GetProperty("entityId").GetString() == remove.Id().ToString());
+    }
+
     /// <summary>The data of the most recent tool result the model has seen.</summary>
     private static JsonElement LastData(IReadOnlyList<LlmMessage> messages) =>
         JsonDocument.Parse(messages.Last(m => m.Role == LlmRole.Tool).Content!).RootElement.GetProperty("data").Clone();

@@ -37,6 +37,13 @@ public sealed class AgentConversation
         LastMessageAt = now;
         UpdatedAt = now;
     }
+
+    /// <summary>User-initiated delete. Soft: carts, purchases and approvals the conversation produced keep their history.</summary>
+    public void Archive(DateTimeOffset now)
+    {
+        Status = ConversationStatus.Archived;
+        UpdatedAt = now;
+    }
 }
 
 public sealed class AgentMessage
