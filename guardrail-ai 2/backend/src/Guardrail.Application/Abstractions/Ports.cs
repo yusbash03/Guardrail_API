@@ -36,6 +36,9 @@ public interface ITokenService
     string HashRefreshToken(string token);
 
     TimeSpan RefreshTokenLifetime { get; }
+
+    /// <summary>How long a just-rotated refresh token may be presented again as a retry before it counts as reuse (SEC-03).</summary>
+    TimeSpan RefreshReuseGrace { get; }
 }
 
 public sealed record CatalogueSearch(

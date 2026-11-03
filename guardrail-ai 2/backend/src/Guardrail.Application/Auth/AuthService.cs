@@ -120,10 +120,17 @@ public sealed class AuthService(
             return new DomainError(ErrorCodes.Unauthenticated, "Invalid refresh token.");
         }
 
+        // A token rotated moments ago coming back is a retry (two tabs refreshing at once, a network or proxy
+        // retry), not theft — as long as its family is still alive. Anything else is reuse: revoke the family (SEC-03).
+        var retry = false;
         if (token.ReplacedById is not null || token.RevokedAt is not null)
         {
-            await RevokeFamilyAsync(token.FamilyId, now, cancellationToken);
-            return new DomainError(ErrorCodes.Unauthenticated, "Refresh token reuse detected. Please sign in again.");
+            retry = await IsRetryOfRecentRotationAsync(token, now, cancellationToken);
+            if (!retry)
+            {
+                await RevokeFamilyAsync(token.FamilyId, now, cancellationToken);
+                return new DomainError(ErrorCodes.Unauthenticated, "Refresh token reuse detected. Please sign in again.");
+            }
         }
 
         if (token.ExpiresAt <= now)
@@ -137,7 +144,21 @@ public sealed class AuthService(
             return new DomainError(ErrorCodes.Unauthenticated, "Account disabled.");
         }
 
-        return await IssueAsync(user, token.FamilyId, ip, cancellationToken, token);
+        // A retry gets its own fresh token in the same family; the token issued by the original rotation stays valid.
+        return await IssueAsync(user, token.FamilyId, ip, cancellationToken, retry ? null : token);
+    }
+
+    private async Task<bool> IsRetryOfRecentRotationAsync(RefreshToken token, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        // Only rotated tokens qualify (ReplaceWith stamps RevokedAt at rotation time); a family revoked by logout or
+        // reuse detection has no active token left, so it never qualifies.
+        if (token.ReplacedById is null || token.RevokedAt is not { } rotatedAt || now - rotatedAt > tokens.RefreshReuseGrace)
+        {
+            return false;
+        }
+
+        return await db.RefreshTokens.AnyAsync(
+            t => t.FamilyId == token.FamilyId && t.RevokedAt == null && t.ReplacedById == null && t.ExpiresAt > now, cancellationToken);
     }
 
     public async Task LogoutAsync(Guid userId, string? refreshToken, CancellationToken cancellationToken)

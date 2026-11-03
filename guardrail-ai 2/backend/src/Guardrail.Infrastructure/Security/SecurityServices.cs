@@ -30,6 +30,12 @@ public sealed class JwtOptions
 
     public int RefreshTokenDays { get; set; } = 7;
 
+    /// <summary>
+    /// Seconds a rotated refresh token is still honoured as a retry (two tabs refreshing at once, a network or proxy
+    /// retry). Later reuse revokes the family. 0 = strict, no grace.
+    /// </summary>
+    public int RefreshReuseGraceSeconds { get; set; } = 30;
+
     public byte[] KeyBytes()
     {
         try
@@ -57,6 +63,8 @@ public sealed class JwtOptionsValidator : IValidateOptions<JwtOptions>
 public sealed class JwtTokenService(IOptions<JwtOptions> options, TimeProvider clock) : ITokenService
 {
     public TimeSpan RefreshTokenLifetime => TimeSpan.FromDays(options.Value.RefreshTokenDays);
+
+    public TimeSpan RefreshReuseGrace => TimeSpan.FromSeconds(Math.Max(0, options.Value.RefreshReuseGraceSeconds));
 
     public (string Token, DateTimeOffset ExpiresAt) CreateAccessToken(User user)
     {

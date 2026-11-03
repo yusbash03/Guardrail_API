@@ -13,6 +13,7 @@ Secrets are **only** environment variables (Render/Vercel dashboards, local `dot
 | `Jwt__SigningKey` | ✅ | ✅ | ≥ 64 random bytes, base64 (HS256) |
 | `Jwt__AccessTokenMinutes` | | | `15` |
 | `Jwt__RefreshTokenDays` | | | `7` |
+| `Jwt__RefreshReuseGraceSeconds` | | | `30` (seconds a rotated refresh token is still accepted as a retry; `0` = strict) |
 | `PayPal__BaseUrl` | ✅ | | `https://api-m.sandbox.paypal.com` |
 | `PayPal__ClientId` | ✅ | ✅ | sandbox app client id |
 | `PayPal__ClientSecret` | ✅ | ✅ | sandbox app secret |

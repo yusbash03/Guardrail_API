@@ -6,7 +6,7 @@ IDs `SEC-xx` are referenced by tests and review checklists.
 
 - **SEC-01** Passwords hashed with ASP.NET Core Identity `PasswordHasher<T>` (PBKDF2, current default iterations). Min length 10; reject top-10k common passwords.
 - **SEC-02** Access JWT: HS256, 15 min, claims `sub`, `email`, `role`, `jti`, `iat`, `exp`, `iss`, `aud`. Validate issuer, audience, lifetime (clock skew 30 s), signing key.
-- **SEC-03** Refresh token: 256-bit random, stored as SHA-256 hash, rotated on every use, family revoked on reuse, httpOnly/Secure/SameSite=Strict cookie scoped to `/api/v1/auth`.
+- **SEC-03** Refresh token: 256-bit random, stored as SHA-256 hash, rotated on every use, family revoked on reuse — except a just-rotated token presented again within `Jwt__RefreshReuseGraceSeconds` (default 30 s) while its family is still active, which is treated as a retry (concurrent tabs, network/proxy retries) and gets a fresh token in the same family; the browser also serialises refreshes across tabs with a Web Lock; httpOnly/Secure/SameSite=Strict cookie scoped to `/api/v1/auth`.
 - **SEC-04** `/auth/refresh` requires `X-Guardrail-Client: web` header and same-origin `Origin` (CSRF defence for cookie-authenticated endpoint).
 - **SEC-05** Login lockout: 5 failures → 5-minute lockout per account + IP rate limit. Generic error messages ("Invalid email or password").
 - **SEC-06** Approving a purchase requires password re-entry (step-up, ADR-015); verified server-side before any state change; failures audited and rate-limited (5 / 15 min); the password field is redacted from all logs and never persisted.

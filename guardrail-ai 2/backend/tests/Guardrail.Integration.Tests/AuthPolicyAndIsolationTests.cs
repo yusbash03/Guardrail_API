@@ -9,7 +9,7 @@ namespace Guardrail.Integration.Tests;
 public class AuthPolicyAndIsolationTests(GuardrailFactory factory)
 {
     [Fact]
-    public async Task IT01_RegisterLoginRefreshRotation_ReuseRevokesFamily()
+    public async Task IT01_RegisterLoginRefreshRotation_ReuseAfterGraceRevokesFamily()
     {
         var user = await TestUser.RegisterAsync(factory);
         var http = factory.CreateClient(new() { HandleCookies = false });
@@ -27,9 +27,57 @@ public class AuthPolicyAndIsolationTests(GuardrailFactory factory)
         var cookie2 = RefreshCookie(rotated);
         cookie2.ShouldNotBe(cookie1);
 
-        // Reusing the rotated token revokes the whole family…
+        // Presented again right away, the rotated token is a retry: it gets its own fresh token, nothing is revoked.
+        var retried = await Refresh(http, cookie1);
+        retried.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var cookie3 = RefreshCookie(retried);
+        cookie3.ShouldNotBe(cookie2);
+
+        // Past the grace window, reusing the rotated token is theft: the whole family is revoked…
+        factory.Clock.Advance(TimeSpan.FromSeconds(31));
         (await Refresh(http, cookie1)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
-        // …so the newest token is dead too.
+        // …so the newest tokens are dead too.
+        (await Refresh(http, cookie2)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await Refresh(http, cookie3)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task IT24_ConcurrentRefreshWithSameToken_BothSucceed_AndSessionSurvives()
+    {
+        var user = await TestUser.RegisterAsync(factory);
+        var http = factory.CreateClient(new() { HandleCookies = false });
+        var login = await http.PostAsJsonAsync("/api/v1/auth/login", new { email = user.Email, password = user.Password });
+        var cookie = RefreshCookie(login);
+
+        // Two tabs (or a retried request) refreshing with the same cookie at the same moment.
+        var results = await Task.WhenAll(Refresh(http, cookie), Refresh(http, cookie));
+        results.ShouldAllBe(r => r.StatusCode == HttpStatusCode.OK);
+
+        // Either new token keeps the session going.
+        foreach (var next in results.Select(RefreshCookie))
+        {
+            (await Refresh(http, next)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+    }
+
+    [Fact]
+    public async Task IT25_AfterLogout_RecentlyRotatedTokenIsNotAcceptedAsRetry()
+    {
+        var user = await TestUser.RegisterAsync(factory);
+        var http = factory.CreateClient(new() { HandleCookies = false });
+        var login = await http.PostAsJsonAsync("/api/v1/auth/login", new { email = user.Email, password = user.Password });
+        var cookie1 = RefreshCookie(login);
+        var rotated = await Refresh(http, cookie1);
+        var cookie2 = RefreshCookie(rotated);
+        var accessToken = (await rotated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("accessToken").GetString();
+
+        var logout = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/logout");
+        logout.Headers.Add("Cookie", cookie2);
+        logout.Headers.Authorization = new("Bearer", accessToken);
+        (await http.SendAsync(logout)).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        // Still inside the grace window, but the family is gone: no retry, no new session.
+        (await Refresh(http, cookie1)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         (await Refresh(http, cookie2)).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
