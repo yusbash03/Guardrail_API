@@ -50,7 +50,7 @@ The agent has exactly 11 tools: search, budgets, carts, evaluation, and requesti
 | AI | Google Gemini (`gemini-3.5-flash-lite`) primary, Groq (`openai/gpt-oss-120b`) fallback, both via OpenAI-compatible tool calling |
 | Payments | PayPal Orders v2 (intent `AUTHORIZE`), Payments v2 capture/void, verified webhooks (Sandbox) |
 | Tests | xUnit, Shouldly, Testcontainers (real Postgres), NetArchTest |
-| Hosting | Render (Docker web service + Render Postgres, via Blueprint) |
+| Hosting | Render (Docker web service, via Blueprint), Neon (PostgreSQL) |
 
 ## Repository layout
 
@@ -99,19 +99,32 @@ cd "guardrail-ai 2/backend"
 dotnet test        # needs Docker: integration tests start a throwaway PostgreSQL
 ```
 
-There are 133 tests:
+There are 134 tests:
 
 - **Domain:** 66 tests of the policy engine, including every worked example in the spec, plus hashing, ledger and state machines.
 - **Architecture:** 7 tests of layering, plus a check that no AI tool can reach payment, approval or rule-changing code.
-- **Integration:** 60 tests that run the full API against real PostgreSQL. They cover auth, purchase isolation between users, approvals, PayPal flows using fakes, webhooks, concurrency and the agent.
+- **Integration:** 61 tests that run the full API against real PostgreSQL. They cover auth, purchase isolation between users, approvals, PayPal flows using fakes, webhooks, concurrency and the agent.
 
 ## Deploying to Render
 
-[`render.yaml`](guardrail-ai%202/render.yaml) defines the API (Docker) and a free Render Postgres database, and connects the two automatically.
+[`render.yaml`](guardrail-ai%202/render.yaml) defines the API as a free Docker web service. The database is [Neon](https://neon.tech) PostgreSQL.
 
-1. In Render, create a **New → Blueprint** from this repo, with the blueprint path `guardrail-ai 2/render.yaml`.
-2. Add the secrets to the `guardrail-secrets` env group: the JWT key, PayPal keys, LLM keys, jobs token and PayPal webhook ID. [Environment Configuration](guardrail-ai%202/docs/api/ENVIRONMENT_CONFIGURATION.md) lists every variable.
-3. After the first deploy, register `https://<your-app>.onrender.com/api/v1/webhooks/paypal` as a webhook on your PayPal sandbox app. Then set `PayPal__WebhookId` to the ID PayPal gives you.
+1. **Migrate the database.** Run migrations against Neon's **direct** endpoint, which is the host without `-pooler`, because migrations take a lock that the pooled endpoint doesn't handle reliably:
+   ```bash
+   cd "guardrail-ai 2/backend"
+   ConnectionStrings__Default='postgresql://<user>:<password>@ep-xxx.<region>.aws.neon.tech/neondb?sslmode=require' \
+     dotnet ef database update --project src/Guardrail.Infrastructure --startup-project src/Guardrail.Infrastructure
+   ```
+2. In Render, create a **New → Blueprint** from this repo, with the blueprint path `guardrail-ai 2/render.yaml`.
+3. Add the secrets to the `guardrail-secrets` env group. [Environment Configuration](guardrail-ai%202/docs/api/ENVIRONMENT_CONFIGURATION.md) lists every variable. The group holds:
+   - `ConnectionStrings__Default`: Neon's **pooled** URL;
+   - the JWT signing key;
+   - the PayPal and LLM keys;
+   - the jobs token;
+   - the PayPal webhook ID.
+4. After the first deploy, register `https://<your-app>.onrender.com/api/v1/webhooks/paypal` as a webhook on your PayPal sandbox app. Then set `PayPal__WebhookId` to the ID PayPal gives you.
+
+The app accepts the connection string either as a `postgresql://` URL (as Neon and Render provide it, including `sslmode` and `channel_binding`) or in Npgsql's `Host=…;Username=…` form.
 
 ## Documentation
 

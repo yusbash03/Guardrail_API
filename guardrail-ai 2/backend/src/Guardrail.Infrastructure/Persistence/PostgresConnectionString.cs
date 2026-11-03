@@ -29,13 +29,25 @@ public static class PostgresConnectionString
             builder.Password = Uri.UnescapeDataString(userInfo[1]);
         }
 
+        // libpq-style query options that Neon/Render put in their URLs (e.g. ?sslmode=require&channel_binding=require).
         foreach (var pair in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
         {
             var parts = pair.Split('=', 2);
-            if (parts[0].Equals("sslmode", StringComparison.OrdinalIgnoreCase) && parts.Length == 2
-                && Enum.TryParse<SslMode>(Uri.UnescapeDataString(parts[1]), ignoreCase: true, out var sslMode))
+            if (parts.Length != 2)
+            {
+                continue;
+            }
+
+            var optionValue = Uri.UnescapeDataString(parts[1]);
+            if (parts[0].Equals("sslmode", StringComparison.OrdinalIgnoreCase)
+                && Enum.TryParse<SslMode>(optionValue, ignoreCase: true, out var sslMode))
             {
                 builder.SslMode = sslMode;
+            }
+            else if (parts[0].Equals("channel_binding", StringComparison.OrdinalIgnoreCase)
+                     && Enum.TryParse<ChannelBinding>(optionValue, ignoreCase: true, out var channelBinding))
+            {
+                builder.ChannelBinding = channelBinding;
             }
         }
 

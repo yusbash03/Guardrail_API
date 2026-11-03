@@ -31,6 +31,18 @@ public sealed class PostgresConnectionStringTests
     }
 
     [Fact]
+    public void NeonPooledUrl_KeepsSslModeAndChannelBinding()
+    {
+        var result = new NpgsqlConnectionStringBuilder(PostgresConnectionString.Normalize(
+            "postgresql://owner:secret@ep-example-123-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"));
+
+        result.Host.ShouldBe("ep-example-123-pooler.c-5.us-east-1.aws.neon.tech");
+        result.Database.ShouldBe("neondb");
+        result.SslMode.ShouldBe(SslMode.Require);
+        result.ChannelBinding.ShouldBe(ChannelBinding.Require);
+    }
+
+    [Fact]
     public void KeyValueString_IsUnchanged()
     {
         const string value = "Host=localhost;Port=5432;Database=guardrail;Username=guardrail;Password=guardrail";

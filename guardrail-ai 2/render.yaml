@@ -1,13 +1,9 @@
 # Render Blueprint (ADR-020). Field names follow DEPLOYMENT_GUIDE.md §3.1 — [VERIFY] against current Render docs before first sync.
-# Secrets (Jwt__SigningKey, PayPal__ClientId/ClientSecret/WebhookId, Llm__*__ApiKey, Jobs__InternalToken, JOBS_TOKEN)
-# live only in the guardrail-secrets env group, never in git. A local, git-ignored .env.render holds them for pasting
-# into the group ("Add from .env"). The database connection string comes from the Render database below.
-databases:
-  # Hackathon/demo: Render Postgres instead of Neon. The free plan expires ~30 days after creation [VERIFY on Render].
-  - name: guardrail-db
-    databaseName: guardrail
-    user: guardrail
-    plan: free
+# Secrets (ConnectionStrings__Default, Jwt__SigningKey, PayPal__ClientId/ClientSecret/WebhookId, Llm__*__ApiKey,
+# Jobs__InternalToken) live only in the guardrail-secrets env group, never in git. A local, git-ignored .env.render
+# holds them for pasting into the group ("Add from .env").
+# Database: Neon (free). ConnectionStrings__Default is Neon's *pooled* URL (postgresql://…-pooler…?sslmode=require);
+# the app accepts the URL form directly.
 services:
   - type: web
     name: guardrail-api
@@ -22,14 +18,11 @@ services:
       - fromGroup: guardrail-secrets
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
-      # Internal postgres:// URL (same region, no TLS needed); the app converts it to Npgsql format.
-      - key: ConnectionStrings__Default
-        fromDatabase:
-          name: guardrail-db
-          property: connectionString
-      # No separate migration step for the demo database (ADR-014 deviation): apply migrations on boot.
+      # Migrations are a separate step (ADR-014), run against Neon's *direct* (non-pooler) endpoint:
+      #   ConnectionStrings__Default='<direct URL>' dotnet ef database update \
+      #     --project src/Guardrail.Infrastructure --startup-project src/Guardrail.Infrastructure
       - key: Database__MigrateOnStartup
-        value: "true"
+        value: "false"
       - key: PayPal__BaseUrl
         value: https://api-m.sandbox.paypal.com
       - key: PayPal__Intent

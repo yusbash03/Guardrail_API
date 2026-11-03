@@ -11,7 +11,7 @@ public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<App
         var connection = Environment.GetEnvironmentVariable("ConnectionStrings__Default")
                          ?? "Host=localhost;Port=5432;Database=guardrail;Username=guardrail;Password=guardrail";
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(connection)
+            .UseNpgsql(PostgresConnectionString.Normalize(connection))
             .UseSnakeCaseNamingConvention()
             .Options;
         return new AppDbContext(options);
