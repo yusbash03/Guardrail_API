@@ -95,8 +95,20 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy(AuthPolicies.Admin, p => p.RequireAuthenticatedUser().RequireClaim("role", "ADMIN"));
 
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+// "*" allows any origin. Credentials forbid a literal wildcard, so the request origin is reflected instead.
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
-    p.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials().WithExposedHeaders("X-Correlation-Id", "Retry-After")));
+{
+    if (corsOrigins.Contains("*"))
+    {
+        p.SetIsOriginAllowed(_ => true);
+    }
+    else
+    {
+        p.WithOrigins(corsOrigins);
+    }
+
+    p.AllowAnyHeader().AllowAnyMethod().AllowCredentials().WithExposedHeaders("X-Correlation-Id", "Retry-After");
+}));
 
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {

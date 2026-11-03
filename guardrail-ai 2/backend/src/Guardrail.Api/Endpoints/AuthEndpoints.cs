@@ -95,7 +95,7 @@ public static class AuthEndpoints
             return true; // same-origin fetches may omit Origin; the custom header still blocks simple cross-site posts
         }
 
-        if (cors.AllowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
+        if (cors.AllowedOrigins.Contains("*") || cors.AllowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
         {
             return true;
         }
