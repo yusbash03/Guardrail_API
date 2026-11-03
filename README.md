@@ -88,7 +88,7 @@ dotnet user-secrets --project src/Guardrail.Api set "Llm:Fallback:ApiKey" "<Groq
 dotnet run --project src/Guardrail.Api
 ```
 
-In Development, the API creates the database tables and seeds demo data on startup. Swagger is at http://localhost:5080/swagger, and the demo user is `demo@guardrail.ai`. Without PayPal keys the app still runs, but checkout returns `503 PAYMENT_PROVIDER_UNAVAILABLE`.
+In Development, the API creates the database tables and seeds demo data on startup, and the demo user is `demo@guardrail.ai`. Interactive API docs are at http://localhost:5080/scalar (Scalar) and http://localhost:5080/swagger. To call protected endpoints, log in with `POST /api/v1/auth/login` and paste the `accessToken` as the Bearer token. The docs are off in Production unless `ApiDocs__Enabled=true`; the Render Blueprint turns them on for the demo. Without PayPal keys the app still runs, but checkout returns `503 PAYMENT_PROVIDER_UNAVAILABLE`.
 
 The PayPal **Business** sandbox account linked to your app must be in a country that can receive payments, such as the US. You pay with a **Personal** sandbox account.
 
@@ -99,11 +99,11 @@ cd "guardrail-ai 2/backend"
 dotnet test        # needs Docker: integration tests start a throwaway PostgreSQL
 ```
 
-There are 134 tests:
+There are 135 tests:
 
 - **Domain:** 66 tests of the policy engine, including every worked example in the spec, plus hashing, ledger and state machines.
 - **Architecture:** 7 tests of layering, plus a check that no AI tool can reach payment, approval or rule-changing code.
-- **Integration:** 61 tests that run the full API against real PostgreSQL. They cover auth, purchase isolation between users, approvals, PayPal flows using fakes, webhooks, concurrency and the agent.
+- **Integration:** 62 tests that run the full API against real PostgreSQL. They cover auth, purchase isolation between users, approvals, PayPal flows using fakes, webhooks, concurrency and the agent.
 
 ## Deploying to Render
 

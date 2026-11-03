@@ -47,7 +47,7 @@ builder.Services.AddProblemDetails();
 builder.Services.ConfigureHttpJsonOptions(o => JsonDefaults.Configure(o.SerializerOptions));
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(CorsSettings.Section));
 builder.Services.AddGuardrailRateLimiting(builder.Configuration);
-builder.Services.AddOpenApi("v1");
+builder.Services.AddOpenApi("v1", o => o.AddBearerSecurity());
 
 var jwt = builder.Configuration.GetSection(JwtOptions.Section).Get<JwtOptions>() ?? new JwtOptions();
 builder.Services
@@ -142,14 +142,10 @@ app.Use(async (context, next) =>
 
 app.UseSerilogRequestLogging(o => o.GetLevel = (ctx, _, ex) =>
     ex is not null || ctx.Response.StatusCode >= 500 ? Serilog.Events.LogEventLevel.Error : Serilog.Events.LogEventLevel.Information);
-// Swagger UI is static middleware (not an endpoint), so it must run before the authenticated-by-default fallback policy.
-if (!app.Environment.IsProduction())
+var apiDocs = ApiDocs.IsEnabled(app);
+if (apiDocs)
 {
-    app.UseSwaggerUI(o =>
-    {
-        o.SwaggerEndpoint("/openapi/v1.json", "Guardrail AI v1");
-        o.RoutePrefix = "swagger";
-    });
+    app.UseSwaggerDocs();
 }
 
 app.UseCors();
@@ -158,6 +154,10 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapOpenApi("/openapi/{documentName}.json").AllowAnonymous();
+if (apiDocs)
+{
+    app.MapScalar();
+}
 
 var api = app.MapGroup("/api/v1");
 api.MapAuthEndpoints();

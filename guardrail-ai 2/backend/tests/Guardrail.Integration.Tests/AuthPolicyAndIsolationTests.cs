@@ -196,6 +196,18 @@ public class AuthPolicyAndIsolationTests(GuardrailFactory factory)
     }
 
     [Fact]
+    public async Task ApiDocs_ScalarAndSwaggerAreAnonymous_AndDocumentDeclaresBearerAuth()
+    {
+        var client = factory.CreateClient();
+        (await client.GetAsync("/scalar")).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await client.GetAsync("/swagger/index.html")).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var document = await client.GetFromJsonAsync<JsonElement>("/openapi/v1.json");
+        var bearer = document.GetProperty("components").GetProperty("securitySchemes").GetProperty("Bearer");
+        bearer.GetProperty("scheme").GetString().ShouldBe("bearer");
+    }
+
+    [Fact]
     public async Task Catalogue_SearchFindsDemoItems()
     {
         var user = await TestUser.RegisterAsync(factory);

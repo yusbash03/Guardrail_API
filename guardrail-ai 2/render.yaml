@@ -23,6 +23,9 @@ services:
       #     --project src/Guardrail.Infrastructure --startup-project src/Guardrail.Infrastructure
       - key: Database__MigrateOnStartup
         value: "false"
+      # Hackathon demo: publish interactive API docs (/scalar, /swagger) in Production. Set "false" to hide them.
+      - key: ApiDocs__Enabled
+        value: "true"
       - key: PayPal__BaseUrl
         value: https://api-m.sandbox.paypal.com
       - key: PayPal__Intent
