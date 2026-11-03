@@ -11,6 +11,8 @@ databases:
 services:
   - type: web
     name: guardrail-api
+    # Without an explicit plan a Blueprint creates a paid instance. Free sleeps after ~15 min idle (slow first request).
+    plan: free
     runtime: docker
     # Relative to the git repo root (Guardrail_API), which holds this project under "guardrail-ai 2/".
     rootDir: "guardrail-ai 2/backend"
@@ -41,17 +43,9 @@ services:
         value: https://api.groq.com/openai/v1
       - key: Llm__Fallback__Model
         value: openai/gpt-oss-120b
-  - type: cron
-    name: guardrail-jobs
-    runtime: image
-    image:
-      url: docker.io/curlimages/curl:8.10.1
-    schedule: "*/10 * * * *"
-    dockerCommand: >-
-      sh -c 'curl -fsS -X POST -H "X-Job-Token: $JOBS_TOKEN"
-      https://guardrail-api.onrender.com/api/v1/internal/jobs/run'
-    envVars:
-      - fromGroup: guardrail-secrets   # must define JOBS_TOKEN (same value as Jobs__InternalToken) [VERIFY]
+  # No Render Cron Job: cron jobs are paid on Render. The same jobs (approval/checkout expiry, webhook processing,
+  # payment reconciliation) run inside the API as background services while it is awake. For a paid setup, a cron
+  # can POST /api/v1/internal/jobs/run with header X-Job-Token: <Jobs__InternalToken> every 10 minutes.
 envVarGroups:
   - name: guardrail-secrets
     envVars: []   # values are pasted in the dashboard from .env.render, never committed
