@@ -2,6 +2,7 @@ using Guardrail.Domain.Agent;
 using Guardrail.Domain.Audit;
 using Guardrail.Domain.Authorization;
 using Guardrail.Domain.Catalogue;
+using Guardrail.Domain.Insights;
 using Guardrail.Domain.Ledger;
 using Guardrail.Domain.Payments;
 using Guardrail.Domain.Shopping;
@@ -259,6 +260,19 @@ internal sealed class IdempotencyKeyConfiguration : IEntityTypeConfiguration<Ide
         b.HasIndex(x => new { x.UserId, x.Key, x.RequestPath }).IsUnique();
         b.Property(x => x.RequestHash).AsHash();
         b.Property(x => x.ResponseBody).AsJson();
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class InsightReportConfiguration : IEntityTypeConfiguration<InsightReport>
+{
+    public void Configure(EntityTypeBuilder<InsightReport> b)
+    {
+        b.ToTable("insight_reports", t => t.HasCheckConstraint("ck_insight_reports_name", "length(name) between 1 and 60"));
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.UserId, x.Name }).IsUnique();
+        b.Property(x => x.Name).IsRequired();
+        b.Property(x => x.State).AsJson().IsRequired();
         b.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
     }
 }

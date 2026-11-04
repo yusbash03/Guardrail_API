@@ -2,6 +2,7 @@ using Guardrail.Domain.Agent;
 using Guardrail.Domain.Audit;
 using Guardrail.Domain.Authorization;
 using Guardrail.Domain.Catalogue;
+using Guardrail.Domain.Insights;
 using Guardrail.Domain.Ledger;
 using Guardrail.Domain.Payments;
 using Guardrail.Domain.Shopping;
@@ -58,6 +59,8 @@ public interface IAppDbContext
     DbSet<AuditLog> AuditLogs { get; }
 
     DbSet<IdempotencyKey> IdempotencyKeys { get; }
+
+    DbSet<InsightReport> InsightReports { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 

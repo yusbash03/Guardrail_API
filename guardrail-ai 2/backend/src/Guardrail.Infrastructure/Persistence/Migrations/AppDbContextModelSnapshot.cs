@@ -672,6 +672,51 @@ namespace Guardrail.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Guardrail.Domain.Insights.InsightReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("state");
+
+                    b.Property<string>("StateVersion")
+                        .HasColumnType("text")
+                        .HasColumnName("state_version");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_insight_reports");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_insight_reports_user_id_name");
+
+                    b.ToTable("insight_reports", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_insight_reports_name", "length(name) between 1 and 60");
+                        });
+                });
+
             modelBuilder.Entity("Guardrail.Domain.Ledger.SpendingLedgerEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1873,6 +1918,16 @@ namespace Guardrail.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_products_merchants_merchant_id");
 
                     b.Navigation("Merchant");
+                });
+
+            modelBuilder.Entity("Guardrail.Domain.Insights.InsightReport", b =>
+                {
+                    b.HasOne("Guardrail.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_insight_reports_users_user_id");
                 });
 
             modelBuilder.Entity("Guardrail.Domain.Ledger.SpendingLedgerEntry", b =>

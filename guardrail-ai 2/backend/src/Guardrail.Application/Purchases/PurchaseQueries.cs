@@ -185,7 +185,7 @@ public sealed class PurchaseQueries(IAppDbContext db)
     }
 
     /// <summary>The active payment, else the most recent one.</summary>
-    private static Payment PickPayment(IEnumerable<Payment> payments)
+    internal static Payment PickPayment(IEnumerable<Payment> payments)
     {
         var list = payments.ToList();
         return list.Where(p => p.IsActive).OrderByDescending(p => p.CreatedAt).FirstOrDefault()

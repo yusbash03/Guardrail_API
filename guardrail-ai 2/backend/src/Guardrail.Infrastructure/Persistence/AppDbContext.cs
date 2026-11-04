@@ -4,6 +4,7 @@ using Guardrail.Domain.Audit;
 using Guardrail.Domain.Authorization;
 using Guardrail.Domain.Catalogue;
 using Guardrail.Domain.Common;
+using Guardrail.Domain.Insights;
 using Guardrail.Domain.Ledger;
 using Guardrail.Domain.Payments;
 using Guardrail.Domain.Shopping;
@@ -60,6 +61,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
+
+    public DbSet<InsightReport> InsightReports => Set<InsightReport>();
 
     public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken) =>
         Database.BeginTransactionAsync(cancellationToken);

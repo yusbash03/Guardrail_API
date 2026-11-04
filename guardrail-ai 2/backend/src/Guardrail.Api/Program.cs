@@ -176,6 +176,7 @@ api.MapAuthEndpoints();
 api.MapPolicyAndCatalogueEndpoints();
 api.MapShoppingEndpoints();
 api.MapLedgerAndAgentEndpoints();
+api.MapInsightsEndpoints();
 api.MapOpsEndpoints();
 
 app.Run();

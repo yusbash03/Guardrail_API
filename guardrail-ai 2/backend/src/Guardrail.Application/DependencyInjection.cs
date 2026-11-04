@@ -8,6 +8,7 @@ using Guardrail.Application.Catalogue;
 using Guardrail.Application.Common;
 using Guardrail.Application.Dashboard;
 using Guardrail.Application.Evaluation;
+using Guardrail.Application.Insights;
 using Guardrail.Application.Jobs;
 using Guardrail.Application.Ledger;
 using Guardrail.Application.Merchants;
@@ -72,6 +73,7 @@ public static class DependencyInjection
         services.AddScoped<JobRunner>();
         services.AddScoped<DashboardService>();
         services.AddScoped<AuditQueries>();
+        services.AddScoped<InsightsService>();
 
         foreach (var toolType in ToolRegistry.ToolTypes)
         {
