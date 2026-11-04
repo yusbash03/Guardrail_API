@@ -48,7 +48,8 @@ public sealed class AgentOptions
 
     public int MaxToolCallsPerTurn { get; set; } = 16;
 
-    public int TurnTimeoutSeconds { get; set; } = 60;
+    /// <summary>Gemini's free tier takes 8–20 s per call, so a 4–5 call shopping turn needs ~100 s. Keep under Vercel's 120 s proxy limit.</summary>
+    public int TurnTimeoutSeconds { get; set; } = 100;
 
     public int HistoryMessages { get; set; } = 20;
 

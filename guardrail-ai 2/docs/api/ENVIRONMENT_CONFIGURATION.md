@@ -35,7 +35,7 @@ Secrets are **only** environment variables (Render/Vercel dashboards, local `dot
 | `Llm__TimeoutSeconds` | | | `30` |
 | `Agent__MaxLlmRequestsPerTurn` | | | `6` |
 | `Agent__MaxToolCallsPerTurn` | | | `16` |
-| `Agent__TurnTimeoutSeconds` | | | `60` |
+| `Agent__TurnTimeoutSeconds` | | | `100` (must stay under Vercel's 120 s proxy limit) |
 | `Approvals__TtlMinutes` | | | `30` |
 | `Approvals__StepUpMaxFailures` | | | `5` (per 15 min) |
 | `Checkout__AuthorizationMaxOpenMinutes` | | | `30` |
