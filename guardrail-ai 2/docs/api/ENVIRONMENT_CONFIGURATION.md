@@ -32,7 +32,9 @@ Secrets are **only** environment variables (Render/Vercel dashboards, local `dot
 | `Llm__Fallback__Model` | | | `openai/gpt-oss-120b` |
 | `Llm__Fallback__ApiKey` | | ✅ | Groq API key (free, no card) |
 | `Llm__Fallback__RequestsPerMinute` | | | `25` |
-| `Llm__TimeoutSeconds` | | | `30` |
+| `Llm__TimeoutSeconds` | | | `50` |
+| `Llm__PrimaryTimeoutSeconds` | | | `50` (whole Gemini attempt; past it the turn fails over to Groq) |
+| `Llm__FallbackMaxRetryAfterSeconds` | | | `45` (longest Groq `Retry-After` honoured) |
 | `Agent__MaxLlmRequestsPerTurn` | | | `6` |
 | `Agent__MaxToolCallsPerTurn` | | | `16` |
 | `Agent__TurnTimeoutSeconds` | | | `100` (must stay under Vercel's 120 s proxy limit) |

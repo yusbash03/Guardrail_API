@@ -42,16 +42,22 @@ public sealed class LlmSettings
         Provider = "Groq", BaseUrl = "https://api.groq.com/openai/v1", Model = "openai/gpt-oss-120b", RequestsPerMinute = 25,
     };
 
-    public int TimeoutSeconds { get; set; } = 30;
+    public int TimeoutSeconds { get; set; } = 50;
 
     /// <summary>Longest Retry-After we wait on the primary before failing over for the rest of the turn.</summary>
     public int MaxRetryAfterSeconds { get; set; } = 5;
 
     /// <summary>
-    /// Longest Retry-After we wait on the fallback. It is the last resort, so waiting beats failing the turn
-    /// (Groq's free tier is 8k tokens/min and a shopping turn can exceed it); bounded by Agent:TurnTimeoutSeconds anyway.
+    /// Whole-attempt budget for the primary (queueing, the call and any Retry-After wait). Past it we fail over:
+    /// Gemini's free tier sometimes stalls well beyond its usual 8–20 s.
     /// </summary>
-    public int FallbackMaxRetryAfterSeconds { get; set; } = 20;
+    public int PrimaryTimeoutSeconds { get; set; } = 50;
+
+    /// <summary>
+    /// Longest Retry-After we wait on the fallback. It is the last resort, so waiting beats failing the turn
+    /// (Groq's free tier is 8k tokens/min and a shopping turn exceeds it); bounded by Agent:TurnTimeoutSeconds anyway.
+    /// </summary>
+    public int FallbackMaxRetryAfterSeconds { get; set; } = 45;
 }
 
 public sealed class LlmProviderException(string provider, HttpStatusCode? status, TimeSpan? retryAfter, string message, Exception? inner = null)
@@ -269,7 +275,8 @@ public sealed class LlmRateLimiters(IOptions<LlmSettings> options) : IDisposable
 }
 
 /// <summary>
-/// Primary → fallback failover (AI_AGENT_SPECIFICATION.md §3). Scoped per request so a failover lasts for the rest of the turn.
+/// Primary → fallback failover (AI_AGENT_SPECIFICATION.md §3). Scoped per request so a failover lasts for the rest of the turn,
+/// except that a failing fallback hands back to the primary once rather than ending the turn.
 /// Both unavailable → <see cref="LlmUnavailableException"/> (503 AGENT_UNAVAILABLE); the rest of the app keeps working.
 /// </summary>
 public sealed class RateLimitedLlmRouter(
@@ -288,13 +295,14 @@ public sealed class RateLimitedLlmRouter(
     {
         var settings = options.Value;
         TimeSpan? retryAfter = null;
+        var primaryTried = false;
 
         if (!_primaryDisabled && settings.Primary.IsConfigured)
         {
+            primaryTried = true;
             try
             {
-                return await CallAsync(PrimaryClientName, settings.Primary, limiters.Primary, messages, tools, llmOptions,
-                    TimeSpan.FromSeconds(settings.MaxRetryAfterSeconds), cancellationToken);
+                return await CallPrimaryAsync(settings, messages, tools, llmOptions, cancellationToken);
             }
             catch (LlmProviderException ex)
             {
@@ -318,7 +326,42 @@ public sealed class RateLimitedLlmRouter(
             }
         }
 
+        // The fallback is rate-limited mid-turn (Groq's 8k tokens/min): the primary failed on an earlier step, so give it another go.
+        if (!primaryTried && settings.Primary.IsConfigured)
+        {
+            try
+            {
+                return await CallPrimaryAsync(settings, messages, tools, llmOptions, cancellationToken);
+            }
+            catch (LlmProviderException ex)
+            {
+                retryAfter = ex.RetryAfter ?? retryAfter;
+                log.LogWarning("Primary LLM {Provider} failed again ({Status})", ex.Provider, ex.Status);
+            }
+        }
+
         throw new LlmUnavailableException("No LLM provider is available.", retryAfter ?? TimeSpan.FromSeconds(30));
+    }
+
+    private async Task<LlmResponse> CallPrimaryAsync(
+        LlmSettings settings,
+        IReadOnlyList<LlmMessage> messages,
+        IReadOnlyList<LlmToolDefinition> tools,
+        LlmOptions llmOptions,
+        CancellationToken cancellationToken)
+    {
+        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        attempt.CancelAfter(TimeSpan.FromSeconds(settings.PrimaryTimeoutSeconds));
+        try
+        {
+            return await CallAsync(PrimaryClientName, settings.Primary, limiters.Primary, messages, tools, llmOptions,
+                TimeSpan.FromSeconds(settings.MaxRetryAfterSeconds), attempt.Token);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new LlmProviderException(settings.Primary.Provider, null, null,
+                $"{settings.Primary.Provider} did not respond within {settings.PrimaryTimeoutSeconds}s.", ex);
+        }
     }
 
     private async Task<LlmResponse> CallAsync(
